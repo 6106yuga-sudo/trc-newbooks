@@ -26,3 +26,4 @@ jobs:
           if ! git diff --cached --quiet; then
             git commit -m 'Update TRC new book data'
             git push
+          fi
