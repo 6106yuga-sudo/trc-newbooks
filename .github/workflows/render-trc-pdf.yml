@@ -1,0 +1,52 @@
+name: Render reviewed TRC PDF
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'reviewed/current.json'
+      - 'render_trc.py'
+      - 'check_layout.py'
+      - '.github/workflows/render-trc-pdf.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install PDF libraries
+        run: python -m pip install 'reportlab==4.2.5' 'PyMuPDF==1.24.14'
+      - name: Validate reviewed input
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          p=pathlib.Path('reviewed/current.json')
+          if not p.is_file():
+              raise SystemExit('選書済み reviewed/current.json が未登録です。PDFは作成しません。')
+          d=json.loads(p.read_text(encoding='utf-8'))
+          if d.get('source_verified') is not True:
+              raise SystemExit('source_verified=true が必要です。')
+          if not d.get('items'):
+              raise SystemExit('選書済み書誌がありません。')
+          print('Source date:', d.get('date'), 'items:', len(d['items']))
+          PY
+      - name: Render fixed-format PDF
+        run: |
+          mkdir -p output
+          python render_trc.py reviewed/current.json output/TRC_newbooks.pdf
+      - name: Check layout
+        run: python check_layout.py output/TRC_newbooks.pdf
+      - name: Publish PDF as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TRC-newbooks-fixed-layout-PDF
+          path: output/TRC_newbooks.pdf
+          if-no-files-found: error
+          retention-days: 30
