@@ -1,0 +1,42 @@
+name: Test TRC fixed-layout PDF
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-layout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install 'reportlab==4.2.5' 'PyMuPDF==1.24.14'
+      - name: Check fixture is test-only
+        run: |
+          python - <<'PYCODE'
+          import json
+          d=json.load(open('tests/layout_fixture.json',encoding='utf-8'))
+          assert d['test_only'] is True
+          assert len(d['items'])==35
+          assert d['source_verified'] is True  # renderer switch, NOT bibliographic verification
+          print('TEST FIXTURE ONLY; NOT FOR PUBLICATION')
+          PYCODE
+      - name: Generate PDF
+        run: |
+          mkdir -p output
+          python render_trc.py tests/layout_fixture.json output/TRC_LAYOUT_TEST_ONLY.pdf
+      - name: Verify PDF layout
+        run: python check_layout.py output/TRC_LAYOUT_TEST_ONLY.pdf
+      - name: Upload test PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: TRC_LAYOUT_TEST_ONLY
+          path: output/TRC_LAYOUT_TEST_ONLY.pdf
+          if-no-files-found: error
+          retention-days: 7
